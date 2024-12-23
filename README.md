@@ -1,0 +1,2 @@
+# PS2IIDXtoPC-with-arduino-uno
+PS2の弐寺専コンをアダプターを改造しarduinoに接続することで、PCで利用可能にするためのソフトのソース
