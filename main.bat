@@ -1,0 +1,1 @@
+npm start -p COM10 -b 115200
