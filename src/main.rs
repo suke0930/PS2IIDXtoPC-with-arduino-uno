@@ -1,10 +1,63 @@
 use std::env;
 use std::process;
 use std::time::Duration;
+use std::time::Instant;
 use std::io::{BufRead, BufReader};
 use std::collections::HashMap;
 
 use enigo::{Enigo, Key, KeyboardControllable};
+
+#[derive(Default)]
+struct ScratchTapReleases {
+    down_deadline: Option<Instant>,
+    up_deadline: Option<Instant>,
+}
+
+impl ScratchTapReleases {
+    fn schedule(&mut self, key: Key, now: Instant, duration: Duration) {
+        match key {
+            Key::Layout('f') => self.down_deadline = Some(now + duration),
+            Key::Layout('r') => self.up_deadline = Some(now + duration),
+            _ => {}
+        }
+    }
+
+    fn clear(&mut self, key: Key) {
+        match key {
+            Key::Layout('f') => self.down_deadline = None,
+            Key::Layout('r') => self.up_deadline = None,
+            _ => {}
+        }
+    }
+
+    fn take_due_keys(&mut self, now: Instant) -> Vec<Key> {
+        let mut due_keys = Vec::with_capacity(2);
+
+        if self.down_deadline.is_some_and(|deadline| deadline <= now) {
+            self.down_deadline = None;
+            due_keys.push(Key::Layout('f'));
+        }
+
+        if self.up_deadline.is_some_and(|deadline| deadline <= now) {
+            self.up_deadline = None;
+            due_keys.push(Key::Layout('r'));
+        }
+
+        due_keys
+    }
+
+    fn clear_all(&mut self) {
+        self.down_deadline = None;
+        self.up_deadline = None;
+    }
+}
+
+fn release_due_scratch_keys(enigo: &mut Enigo, releases: &mut ScratchTapReleases) {
+    let now = Instant::now();
+    for key in releases.take_due_keys(now) {
+        enigo.key_up(key);
+    }
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -59,7 +112,7 @@ fn main() {
 
     println!("Opening serial port {} at {} baud...", port_name, baud_rate);
     let port_result = serialport::new(port_name.clone(), baud_rate)
-        .timeout(Duration::from_millis(1000))
+        .timeout(Duration::from_millis(10))
         .open();
 
     let mut port = match port_result {
@@ -76,11 +129,14 @@ fn main() {
     let mut reader = BufReader::new(port.as_mut());
     let mut enigo = Enigo::new();
     let mut ignore = false;
+    let mut scratch_tap_releases = ScratchTapReleases::default();
+    let scratch_tap_duration = Duration::from_millis(100);
 
     let mut line = String::new();
     println!("Listening for input...");
 
     loop {
+        release_due_scratch_keys(&mut enigo, &mut scratch_tap_releases);
         line.clear();
         match reader.read_line(&mut line) {
             Ok(0) => {
@@ -99,6 +155,7 @@ fn main() {
                                 if ignore {
                                     enigo.key_up(Key::Layout('r'));
                                     enigo.key_up(Key::Layout('f'));
+                                    scratch_tap_releases.clear_all();
                                 }
 
                                 if key == Key::Layout('a') {
@@ -114,14 +171,14 @@ fn main() {
                                     enigo.key_down(key);
                                 } else if (key == Key::Layout('f') || key == Key::Layout('r')) && ignore {
                                     enigo.key_down(key);
-                                    std::thread::sleep(Duration::from_millis(100));
-                                    enigo.key_up(key);
+                                    scratch_tap_releases.schedule(key, Instant::now(), scratch_tap_duration);
                                 }
                             } else {
                                 // Release event
                                 if key == Key::Layout('a') {
                                     ignore = false;
                                 }
+                                scratch_tap_releases.clear(key);
                                 enigo.key_up(key);
                             }
                         }
@@ -135,5 +192,35 @@ fn main() {
                 eprintln!("Error reading from serial port: {:?}", e);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ScratchTapReleases;
+    use enigo::Key;
+    use std::time::Duration;
+    use std::time::Instant;
+
+    #[test]
+    fn scratch_tap_releases_after_deadline() {
+        let mut releases = ScratchTapReleases::default();
+        let start = Instant::now();
+
+        releases.schedule(Key::Layout('f'), start, Duration::from_millis(100));
+        assert!(releases.take_due_keys(start + Duration::from_millis(99)).is_empty());
+
+        let due = releases.take_due_keys(start + Duration::from_millis(100));
+        assert_eq!(due, vec![Key::Layout('f')]);
+    }
+
+    #[test]
+    fn clear_prevents_late_release() {
+        let mut releases = ScratchTapReleases::default();
+        let start = Instant::now();
+
+        releases.schedule(Key::Layout('r'), start, Duration::from_millis(100));
+        releases.clear(Key::Layout('r'));
+        assert!(releases.take_due_keys(start + Duration::from_millis(100)).is_empty());
     }
 }
