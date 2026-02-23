@@ -1,0 +1,8 @@
+[package]
+name = "ps2iidx_controller"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serialport = "4.3.0"
+enigo = "0.1.2" # Windows/Linux等対応のキーボード・マウスエミュレーション
