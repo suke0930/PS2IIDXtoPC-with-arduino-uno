@@ -1,0 +1,27 @@
+{
+  "name": "controller-visualizer",
+  "version": "1.0.0",
+  "description": "Visualizer for game controller input",
+  "main": "index.ts",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.2",
+    "@serialport/parser-readline": "^10.5.0",
+    "chalk": "^4.1.2",
+    "commander": "^9.4.1",
+    "serialport": "^10.5.0",
+    "vigemclient": "^1.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.68",
+    "@types/serialport": "^8.0.2",
+    "nexe": "^4.0.0-rc.6",
+    "robot": "^0.3.0",
+    "robotjs": "^0.6.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.3"
+  }
+}

@@ -1,8 +1,17 @@
 [package]
 name = "ps2iidx_controller"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
 serialport = "4.3.0"
-enigo = "0.1.2" # Windows/Linux等対応のキーボード・マウスエミュレーション
+enigo = "0.1.2"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dotenvy = "0.15"
+crossterm = "0.28"
+ctrlc = "3.4"
+
+[target.'cfg(windows)'.dependencies]
+vigem-client = "0.1"

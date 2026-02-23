@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     mingw-w64 \
     pkg-config \
     libudev-dev \
+    libxdo-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Add the Windows target
