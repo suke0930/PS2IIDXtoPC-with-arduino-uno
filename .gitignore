@@ -1,4 +1,16 @@
-.history/**
-node_modules/**
-NestJS*
+# Rust
+/target/
+Cargo.lock
+
+# Node.js (legacy)
+node_modules/
 *.js
+
+# IDE/Editor
+.history/
+
+# Environment
+.env
+
+# Other
+NestJS*

@@ -1,0 +1,22 @@
+{
+  "name": "x360.pad",
+  "output": "x360",
+  "buttons": {
+    "0": { "type": "button", "name": "LEFT_THUMB" },
+    "1": { "type": "button", "name": "LEFT_THUMB" },
+    "2": { "type": "button", "name": "RIGHT_THUMB" },
+    "3": { "type": "button", "name": "BACK" },
+    "4": { "type": "dpad", "direction": "up" },
+    "5": { "type": "dpad", "direction": "right" },
+    "6": { "type": "dpad", "direction": "down" },
+    "7": { "type": "dpad", "direction": "left" },
+    "8": { "type": "trigger", "trigger": "left" },
+    "9": { "type": "trigger", "trigger": "right" },
+    "10": { "type": "button", "name": "LEFT_SHOULDER" },
+    "11": { "type": "button", "name": "RIGHT_SHOULDER" },
+    "12": { "type": "button", "name": "Y" },
+    "13": { "type": "button", "name": "B" },
+    "14": { "type": "button", "name": "A" },
+    "15": { "type": "button", "name": "X" }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "iidx.keyboard",
+  "output": "keyboard",
+  "buttons": {
+    "0": { "key": "F21" },
+    "1": { "key": "RightShift" },
+    "2": { "key": "RightControl" },
+    "3": { "key": "F18" },
+    "4": { "key": "F13" },
+    "5": { "key": "F14" },
+    "6": { "key": "F15" },
+    "7": { "key": "F16" },
+    "8": { "key": "F17" },
+    "9": { "key": "F18" },
+    "10": { "key": "F14" },
+    "11": { "key": "F20" },
+    "12": { "key": "F21" },
+    "13": { "key": "F22" },
+    "14": { "key": "F23" },
+    "15": { "key": "F24" }
+  },
+  "special": {
+    "ignoreKey": "F14",
+    "tapKeys": ["F13", "F15"],
+    "tapDurationMs": 13,
+    "releaseOnIgnore": ["F13", "F15"]
+  }
+}
