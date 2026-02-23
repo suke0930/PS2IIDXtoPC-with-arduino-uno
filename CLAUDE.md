@@ -6,14 +6,16 @@ This project converts PS2 IIDX (beatmania IIDX) dedicated controller input to PC
 
 **Tech Stack:**
 - **Hardware:** Arduino Uno/Atmega328p with PsxControllerBitBang library
-- **PC Side:** Node.js + TypeScript
-- **Dependencies:**
+- **PC Side:** Rust (stable edition 2021) with Cargo build system
+- **Key Dependencies:**
   - `serialport`: Arduino serial communication
-  - `@serialport/parser-readline`: Serial data parsing
-  - `@nut-tree-fork/nut-js`: Keyboard input emulation
-  - `vigemclient`: Virtual Xbox 360 controller (requires ViGEmBus on Windows)
-  - `commander`: CLI argument parsing
-  - `chalk`: Terminal output formatting
+  - `enigo`: Keyboard input emulation (cross-platform)
+  - `clap`: CLI argument parsing with derive macros
+  - `serde`/`serde_json`: JSON mapping configuration
+  - `dotenvy`: Environment variable loading (.env support)
+  - `crossterm`: Terminal UI (interactive launcher)
+  - `vigem-client`: Virtual Xbox 360 controller (Windows-only, feature-gated)
+  - `ctrlc`: Graceful shutdown handling
 
 **Platform:** Primarily Windows (ViGEm dependency), but keyboard mode works cross-platform.
 
@@ -28,96 +30,102 @@ The project follows a modular architecture with clear separation of concerns:
 │   └── sketch_dec16a/
 │       └── sketch_dec16a.ino   # Arduino firmware for PS2 controller reading
 ├── src/
-│   ├── cli.ts                  # Main CLI entry point and command parsing
-│   ├── serial.ts               # Serial communication handler
-│   ├── launcher.ts             # Interactive launcher for port/mode selection
-│   ├── mapping.ts              # JSON mapping loader and validator
-│   ├── types.ts                # TypeScript type definitions
-│   ├── env.ts                  # Environment variable loader
+│   ├── main.rs                 # Entry point, delegates to cli::run_cli()
+│   ├── cli.rs                  # Main CLI logic and output adapter creation
+│   ├── serial.rs               # Serial communication handler
+│   ├── launcher.rs             # Interactive launcher for port/mode selection
+│   ├── mapping.rs              # JSON mapping loader and validator
+│   ├── types.rs                # Rust type definitions
+│   ├── env.rs                  # Environment variable loader
 │   └── outputs/
-│       ├── keyboard.ts         # Keyboard output adapter (@nut-tree-fork/nut-js)
-│       └── x360.ts             # Xbox 360 gamepad output adapter (vigemclient)
+│       ├── mod.rs              # Output adapter trait and factory
+│       ├── keyboard.rs         # Keyboard output adapter (enigo)
+│       └── x360.rs             # Xbox 360 gamepad output adapter (vigem-client)
 ├── mapping/
 │   ├── iidx.keyboard.json      # IIDX keyboard mapping configuration
 │   ├── popn.keyboard.json      # Pop'n Music keyboard mapping
 │   └── x360.pad.json           # Xbox 360 gamepad mapping
-├── index.ts                    # Entry point (delegates to src/cli.ts)
+├── Cargo.toml                  # Rust package manifest and dependencies
+├── Cargo.lock                  # Locked dependency versions
 ├── .env.example                # Environment variable template
-└── package.json                # Dependencies and build scripts
+└── target/                     # Build output directory
 ```
 
-### Legacy Files (Deprecated)
+### Legacy Files (Archived)
 
-The following files are from the old implementation and should not be modified:
-- `indexV2.ts`, `popen.ts`, `pad.js`, `pad.ts` - Old implementations before refactoring
-- These are kept for reference but are superseded by the `src/` directory structure
+The TypeScript/Node.js implementation has been archived:
+- `ts-legacy/` - Original TypeScript/Node.js implementation (kept for reference, do not use)
+- Old implementations are superseded by the current Rust implementation
 
 ### Data Flow
 
 1. **Arduino → Serial:** PS2 controller button events sent as `b:<id>:<state>` (e.g., `b:14:1`)
-2. **Serial → Parser:** `src/serial.ts` parses incoming data into `ButtonEvent` objects
+2. **Serial → Parser:** `src/serial.rs` parses incoming data into `ButtonEvent` objects
 3. **Parser → Output Adapter:** Events dispatched to keyboard or x360 output adapter
 4. **Output → OS:** Keyboard/gamepad input injected into operating system
 
 ### Key Components
 
-#### 1. Serial Communication (`src/serial.ts`)
+#### 1. Serial Communication (`src/serial.rs`)
 - Opens serial port connection to Arduino
 - Parses `b:<id>:<state>` protocol
-- Emits `ButtonEvent` objects: `{ id: number, pressed: boolean }`
+- Emits `ButtonEvent` objects: `{ id: u8, pressed: bool }`
 - Ignores malformed or non-button messages (turntable `t:` messages currently unused)
 
 #### 2. Output Adapters (`src/outputs/`)
-- **Keyboard Adapter:** Uses @nut-tree-fork/nut-js to press/release keyboard keys
+- **Keyboard Adapter:** Uses `enigo` crate to press/release keyboard keys
   - Supports special features: tap keys, ignore keys, delayed release
   - Configurable via `special` section in JSON mappings
-- **X360 Adapter:** Creates virtual Xbox 360 controller via ViGEmClient
+- **X360 Adapter:** Creates virtual Xbox 360 controller via `vigem-client`
   - Handles buttons, D-pad (as axes), and triggers separately
   - Requires ViGEmBus driver installed on Windows
+  - Feature-gated with conditional compilation for Windows
 
-#### 3. Mapping System (`src/mapping.ts`)
+#### 3. Mapping System (`src/mapping.rs`)
 - Loads JSON mapping files from `mapping/` directory
-- Validates button IDs and output types
+- Validates button IDs and output types using serde
 - Supports two output types: `keyboard` and `x360`
 - Default mappings: `iidx`, `popn`, `x360`
 
-#### 4. Interactive Launcher (`src/launcher.ts`)
+#### 4. Interactive Launcher (`src/launcher.rs`)
 - Auto-detects available serial ports
-- Interactive arrow-key selection menu
+- Interactive menu UI using crossterm
 - Prompts for baud rate and mode selection
 - Supports custom mapping file paths
 
-#### 5. Environment Configuration (`src/env.ts`)
-- Loads `.env` file for default values
+#### 5. Environment Configuration (`src/env.rs`)
+- Loads `.env` file for default values via dotenvy
 - Supported variables:
   - `DEFAULT_PORT`: Default COM port (e.g., `COM10`)
   - `DEFAULT_BAUD`: Default baud rate (default: `115200`)
   - `DEFAULT_MODE`: Default mapping mode (default: `iidx`)
   - `DEFAULT_OFFSET`: Default input delay in milliseconds (default: `0`)
   - `DEFAULT_DEBUG`: Enable debug logging (`0` or `1`)
-  - `DEFAULT_MAP`: Custom mapping file path
 
 ## Development Commands
 
 ### Setup
 ```bash
-npm install              # Install dependencies
-cp .env.example .env     # Create environment configuration
+cargo build --release   # Build optimized binary
+cp .env.example .env    # Create environment configuration (optional)
 ```
 
 ### Running
 ```bash
 # Interactive launcher (recommended for first-time use)
-npm start -- --launcher
+cargo run -- --launcher
 
 # Direct execution with options
-npm start -- -p COM10 -b 115200 -m iidx
-npm start -- -p COM10 -m popn --offset 10
-npm start -- -p COM10 --map ./custom-mapping.json
+cargo run -- -p COM10 -b 115200 -m iidx
+cargo run -- -p COM10 -m popn --offset 10
+cargo run -- -p COM10 --map ./custom-mapping.json
 
 # Using environment variables
 # Edit .env file first, then:
-npm start
+cargo run
+
+# Release binary
+./target/release/ps2iidx_controller -p COM10 -m iidx
 ```
 
 ### CLI Options
@@ -131,7 +139,8 @@ npm start
 
 ### Building
 ```bash
-npm run build           # Compile TypeScript to JavaScript
+cargo build             # Compile debug binary
+cargo build --release   # Compile optimized binary for distribution
 ```
 
 ### Arduino Setup
@@ -215,49 +224,44 @@ Before making significant changes, ask the user for clarification in these cases
 1. **Changing Protocol:** Implementing turntable `t:` message processing (currently intentionally unused)
 2. **Adding New Modes:** Creating new mapping files beyond IIDX/Pop'n/X360
 3. **Modifying Arduino Code:** Changes to pin assignments or communication protocol
-4. **Dependency Changes:** Upgrading major dependencies (serialport, vigemclient, nut-js)
+4. **Dependency Changes:** Major Cargo dependency updates (serialport, vigem-client, enigo, clap)
 5. **Output Behavior:** Changing tap key behavior, offset defaults, or special key handling
-6. **Build/Distribution:** Creating executables with nexe or similar bundlers
+6. **Build/Distribution:** Creating standalone executables or Windows installers
 
 ## Common Patterns
 
 ### Adding a New Mapping Mode
 
 1. Create JSON file in `mapping/` directory (e.g., `mapping/custom.keyboard.json`)
-2. Add entry to `DEFAULT_MAPS` in `src/mapping.ts`:
-   ```typescript
-   export const DEFAULT_MAPS: Record<string, string> = {
-     iidx: path.join('mapping', 'iidx.keyboard.json'),
-     popn: path.join('mapping', 'popn.keyboard.json'),
-     x360: path.join('mapping', 'x360.pad.json'),
-     custom: path.join('mapping', 'custom.keyboard.json'), // Add this
-   };
+2. Add entry to `DEFAULT_MAPS` in `src/mapping.rs`:
+   ```rust
+   "custom" => Some("mapping/custom.keyboard.json".to_string()),
    ```
-3. Test with: `npm start -- -p COM10 -m custom`
+3. Test with: `cargo run -- -p COM10 -m custom`
 
 ### Debugging Serial Communication
 
 Enable debug mode to see raw serial events:
 ```bash
-npm start -- -p COM10 -d
+cargo run -- -p COM10 -d
 ```
 
 Output will show:
 - `[serial] ignored: <message>` - Non-button messages
 - `[serial] invalid: <message>` - Malformed messages
-- `[keyboard] press/release <key>` - Key events
-- `[x360] press/release button <id>` - Gamepad events
+- `[keyboard] press: <key> / release: <key>` - Key events
+- `[x360] press button <id> / release button <id>` - Gamepad events
 
 ## Known Issues
 
-1. **Character Encoding in README.md:** Some Japanese characters may appear garbled
-2. **Turntable Messages:** Arduino sends `t:` messages but PC side doesn't process them
-3. **Legacy Files:** Old implementations (`indexV2.ts`, `popen.ts`, etc.) should be cleaned up in future releases
+1. **README.md:** Japanese documentation may need updating for Rust implementation
+2. **Turntable Messages:** Arduino sends `t:` messages but PC side doesn't process them (intentional)
+3. **Legacy TypeScript:** Superseded by Rust implementation in `ts-legacy/` directory
 
 ## Future Improvements
 
-See `IMPROVEMENT_PLAN.md` for detailed roadmap. Key items:
 - Schema validation for mapping JSON files
-- Executable packaging for distribution
 - Enhanced debug output with input/output logging
-- Dependency separation for smaller builds
+- Windows installer or standalone executable packaging
+- Performance optimization for real-time input handling
+- Additional mapping presets for other rhythm games
