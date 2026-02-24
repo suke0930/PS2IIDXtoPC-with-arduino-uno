@@ -22,17 +22,43 @@ pub struct LauncherResult {
     pub map_path: Option<String>,
 }
 
-/// List available serial ports.
-fn list_serial_ports() -> Vec<String> {
+struct PortInfo {
+    name: String,
+    description: Option<String>,
+}
+
+impl PortInfo {
+    fn display_label(&self) -> String {
+        match &self.description {
+            Some(desc) => format!("{} ({})", self.name, desc),
+            None => self.name.clone(),
+        }
+    }
+}
+
+/// List available serial ports with device descriptions.
+fn list_serial_ports() -> Vec<PortInfo> {
     match serialport::available_ports() {
-        Ok(ports) => ports.into_iter().map(|p| p.port_name).collect(),
+        Ok(ports) => ports
+            .into_iter()
+            .map(|p| {
+                let description = match &p.port_type {
+                    serialport::SerialPortType::UsbPort(usb) => usb.product.clone(),
+                    _ => None,
+                };
+                PortInfo {
+                    name: p.port_name,
+                    description,
+                }
+            })
+            .collect(),
         Err(_) => Vec::new(),
     }
 }
 
 /// Interactive port selector using crossterm raw mode.
 fn select_port_interactive(
-    ports: &[String],
+    ports: &[PortInfo],
     default_index: Option<usize>,
 ) -> io::Result<Option<String>> {
     let mut selected = default_index.unwrap_or(0);
@@ -59,7 +85,7 @@ fn select_port_interactive(
                 } else {
                     ""
                 };
-                write!(stdout, "{}{}{}\r\n", marker, port, default_label)?;
+                write!(stdout, "{}{}{}\r\n", marker, port.display_label(), default_label)?;
             }
             stdout.flush()?;
 
@@ -85,7 +111,7 @@ fn select_port_interactive(
                         selected = (selected + 1) % ports.len();
                     }
                     KeyCode::Enter => {
-                        return Ok(Some(ports[selected].clone()));
+                        return Ok(Some(ports[selected].name.clone()));
                     }
                     KeyCode::Esc | KeyCode::Char('q') => {
                         return Ok(None);
@@ -120,13 +146,13 @@ pub fn run_launcher(defaults: LauncherDefaults) -> Result<LauncherResult, String
             let default_index = defaults
                 .port
                 .as_ref()
-                .and_then(|dp| ports.iter().position(|p| p == dp));
+                .and_then(|dp| ports.iter().position(|p| p.name == *dp));
             selected_port = select_port_interactive(&ports, default_index)
                 .map_err(|e| format!("Launcher error: {}", e))?;
         } else {
             println!("Available ports:");
             for (i, port) in ports.iter().enumerate() {
-                println!("  [{}] {}", i + 1, port);
+                println!("  [{}] {}", i + 1, port.display_label());
             }
         }
     } else {
@@ -147,7 +173,7 @@ pub fn run_launcher(defaults: LauncherDefaults) -> Result<LauncherResult, String
             defaults
                 .port
                 .clone()
-                .or_else(|| ports.first().cloned())
+                .or_else(|| ports.first().map(|p| p.name.clone()))
                 .ok_or_else(|| "Port is required to continue.".to_string())?
         } else {
             input
