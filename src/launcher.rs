@@ -2,7 +2,7 @@ use std::io::{self, IsTerminal, Write};
 
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
     execute,
     terminal::{self, ClearType},
 };
@@ -65,6 +65,9 @@ fn select_port_interactive(
 
             // Read key event
             if let Event::Key(key_event) = event::read()? {
+                if key_event.kind != KeyEventKind::Press {
+                    continue;
+                }
                 if key_event.modifiers.contains(KeyModifiers::CONTROL)
                     && key_event.code == KeyCode::Char('c')
                 {
