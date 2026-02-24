@@ -9,6 +9,19 @@ use crate::types::{
     X360ButtonEntry, X360Mapping,
 };
 
+const EMBEDDED_IIDX: &str = include_str!("../mapping/iidx.keyboard.json");
+const EMBEDDED_POPN: &str = include_str!("../mapping/popn.keyboard.json");
+const EMBEDDED_X360: &str = include_str!("../mapping/x360.pad.json");
+
+fn embedded_mapping(file_path: &str) -> Option<&'static str> {
+    match file_path {
+        "mapping/iidx.keyboard.json" => Some(EMBEDDED_IIDX),
+        "mapping/popn.keyboard.json" => Some(EMBEDDED_POPN),
+        "mapping/x360.pad.json" => Some(EMBEDDED_X360),
+        _ => None,
+    }
+}
+
 pub fn default_maps() -> HashMap<&'static str, &'static str> {
     let mut maps = HashMap::new();
     maps.insert("iidx", "mapping/iidx.keyboard.json");
@@ -26,28 +39,43 @@ pub fn load_mapping(file_path: &str) -> Result<MappingConfig, String> {
             .join(file_path)
     };
 
-    let raw_text = fs::read_to_string(&resolved)
-        .map_err(|e| format!("Failed to read mapping file {}: {}", resolved.display(), e))?;
+    let raw_text = match fs::read_to_string(&resolved) {
+        Ok(text) => text,
+        Err(_) => embedded_mapping(file_path)
+            .ok_or_else(|| {
+                format!(
+                    "Mapping file not found: {} (no embedded default available)",
+                    resolved.display()
+                )
+            })?
+            .to_string(),
+    };
+
+    let source_label = if resolved.exists() {
+        resolved.display().to_string()
+    } else {
+        format!("{} (embedded)", file_path)
+    };
 
     let parsed: Value = serde_json::from_str(&raw_text)
-        .map_err(|e| format!("Failed to parse mapping JSON at {}: {}", resolved.display(), e))?;
+        .map_err(|e| format!("Failed to parse mapping JSON at {}: {}", source_label, e))?;
 
     let obj = parsed
         .as_object()
-        .ok_or_else(|| format!("Mapping JSON must be an object ({})", resolved.display()))?;
+        .ok_or_else(|| format!("Mapping JSON must be an object ({})", source_label))?;
 
     let output = obj
         .get("output")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| format!("Mapping must have \"output\" field ({})", resolved.display()))?;
+        .ok_or_else(|| format!("Mapping must have \"output\" field ({})", source_label))?;
 
     let buttons_value = obj
         .get("buttons")
-        .ok_or_else(|| format!("Mapping must have \"buttons\" field ({})", resolved.display()))?;
+        .ok_or_else(|| format!("Mapping must have \"buttons\" field ({})", source_label))?;
 
     let buttons_obj = buttons_value
         .as_object()
-        .ok_or_else(|| format!("\"buttons\" must be an object ({})", resolved.display()))?;
+        .ok_or_else(|| format!("\"buttons\" must be an object ({})", source_label))?;
 
     let name = obj.get("name").and_then(|v| v.as_str()).map(String::from);
 
@@ -89,7 +117,7 @@ pub fn load_mapping(file_path: &str) -> Result<MappingConfig, String> {
         other => Err(format!(
             "Mapping output must be \"keyboard\" or \"x360\", got \"{}\" ({})",
             other,
-            resolved.display()
+            source_label
         )),
     }
 }
