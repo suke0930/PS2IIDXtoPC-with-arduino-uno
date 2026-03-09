@@ -35,6 +35,13 @@ where
         .map_err(|e| format!("Error opening port {}: {:?}", options.path, e))?;
 
     println!("Port {} opened successfully", options.path);
+
+    // Wait for Arduino to reset and boot.
+    // Opening the serial port asserts DTR which triggers Arduino's auto-reset circuit.
+    // We wait 2 seconds for the bootloader to finish and the sketch to start.
+    println!("Waiting for Arduino to boot...");
+    std::thread::sleep(Duration::from_secs(2));
+
     println!("Listening for input...");
 
     let mut reader = BufReader::new(port);

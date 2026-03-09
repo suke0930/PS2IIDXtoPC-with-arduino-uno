@@ -19,8 +19,12 @@ int last_scr_pos = 0;
 uint16_t prev_buttons = 0;
 uint16_t curr_buttons = 0;
 
+// Heartbeat
+unsigned long lastHeartbeat = 0;
+
 void setup() {
     Serial.begin(115200);
+    Serial.println("h:boot");
 }
 
 void send_button_event(uint8_t button_id, bool is_press) {
@@ -57,6 +61,11 @@ void check_turntable_changes() {
 }
 
 void loop() {
+    if (millis() - lastHeartbeat >= 1000) {
+        Serial.println("h:ok");
+        lastHeartbeat = millis();
+    }
+
     psx.begin();
     psx.read();
     
